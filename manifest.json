@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "N/A",
+  "version": "1.0",
+  "description": "N/A",
+
+  "icons": {
+    "48": "src/icons/icon48.png"
+  },
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "ai" 
+  ],
+
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": "src/icons/icon48.png"
+  },
+
+  "background": {
+    "service_worker": "src/background.js"
+  }
+}
