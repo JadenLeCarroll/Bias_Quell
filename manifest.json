@@ -1,25 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "N/A",
+  "name": "Bias Quell",
   "version": "1.0",
-  "description": "N/A",
-
+  "description": "Analyzes news articles for emotional bias and rewrites/summarizes them to be objective using on-device AI.",
   "icons": {
-    "48": "src/icons/icon48.png"
+    "16": "src/icons/icon16.png",
+    "48": "src/icons/icon48.png",
+    "128": "src/icons/icon128.png"
   },
-
   "permissions": [
+    "sidePanel",
     "activeTab",
     "scripting",
-    "ai" 
+    "ai"
   ],
-
   "action": {
-    "default_popup": "src/popup.html",
+    "default_title": "Bias Quell",
     "default_icon": "src/icons/icon48.png"
   },
-
-  "background": {
-    "service_worker": "src/background.js"
+  "side_panel": {
+    "default_path": "src/sidepanel.html"
   }
 }
