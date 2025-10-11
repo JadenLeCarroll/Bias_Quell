@@ -1,13 +1,11 @@
-Project Title    NA
+Project Title               NA
 
-Problem Solved   NA
+Problem Solved              NA
 
-Features and     NA
-Functionality  
+Features and Functionality  NA  
 
-APIs Used        NA
+APIs Used                   NA
 
-Setup &          NA
-Installation
+Setup & Installation        NA
 
-Demo Video Link  NA
+Demo Video Link             NA
