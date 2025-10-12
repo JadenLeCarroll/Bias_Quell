@@ -182,3 +182,7 @@ cython_debug/
 
 # Visual Studio temporary files
 .vs/
+
+# Hide manifest data for local overrides
+local.manifest.json
+manifest.local.json

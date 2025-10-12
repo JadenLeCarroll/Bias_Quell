@@ -2,37 +2,24 @@
   "manifest_version": 3,
   "name": "Bias Quell",
   "version": "1.0",
-  "description": "Analyzes news articles for emotional bias and rewrites/summarizes them to be objective using on-device AI.",
-  "icons": {
-    "16": "src/icons/icon16.png",
-    "48": "src/icons/icon48.png",
-    "128": "src/icons/icon128.png"
-  },
+  "description": "Removes bias from financial and political articles using Chrome's built-in AI APIs to present just the facts.",
+  
   "permissions": [
     "activeTab",
-    "scripting",
-    "storage"
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
+
   "action": {
-    "default_title": "Bias Quell",
-    "default_icon": "src/icons/icon48.png",
-    "default_popup": "src/sidepanel.html"
+    "default_title": "Bias Quell: Filter Content",
+    "default_popup": "src/popup.html"
   },
-  "side_panel": {
-    "default_path": "src/sidepanel.html",
-    "default_icon": {
-      "16": "src/icons/icon16.png",
-      "48": "src/icons/icon48.png",
-      "128": "src/icons/icon128.png"
-    }
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
-    }
+
+  "trial_tokens": [
+    "AvOoXdyC7pjXgTDTl3qbqieYwYxS1ual6OYEm4Q1NjmL/sKn2QkHXmNUsVWSNkUl+HtGAA4+XrJIVC/6aUFCEg0AAAB7eyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vcGhjZGZrbGFrbWhncG5nbWJpZGtscGpoY21iY3BnZWEiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDB9",
+    "AvADzntJl+rb5O7N2z4eFuqzF+662AjzX9uvEq6/CKJxwNxlhwDkeDtACgLElsV/3M7+dOsp97tXhDZ3FZt0WwIAAABueyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vcGhjZGZrbGFrbWhncG5nbWJpZGtscGpoY21iY3BnZWEiLCJmZWF0dXJlIjoiQUlSZXdyaXRlckFQSSIsImV4cGlyeSI6MTc2OTQ3MjAwMH0=",
+    "As8Bo9pGw22W8lmthwbh+lKIE0s8GmumUoIqwtRmnmjDFHdOXNq3Z02TJDjdpz8gx34VgSt76TrsouuE++b3iQoAAABzeyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vcGhjZGZrbGFrbWhncG5nbWJpZGtscGpoY21iY3BnZWEiLCJmZWF0dXJlIjoiQUlTdW1tYXJpemF0aW9uQVBJIiwiZXhwaXJ5IjoxNzYwNDAwMDAwfQ=="
   ]
 }

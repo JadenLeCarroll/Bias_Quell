@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bias Quell</title>
+    <style>
+        /* General Setup */
+        body {
+            width: 300px;
+            padding: 16px;
+            font-family: 'Inter', Arial, sans-serif;
+            background-color: #ffffff;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        h1 {
+            /* Neutral gray color for title */
+            color: #5f6368;
+            font-size: 20px;
+            margin: 0 0 16px 0;
+            font-weight: 600;
+        }
+        
+        /* Input Area Styling */
+        #promptInput {
+            width: 100%;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            padding: 8px;
+            resize: none;
+            box-sizing: border-box; /* Include padding in width */
+            font-size: 13px;
+        }
+
+        /* Button Styling (General) */
+        button {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Main Button (Analyze Article) */
+        #analyzeArticleButton {
+            background-color: #5f6368; /* Neutral gray */
+            color: white;
+        }
+        #analyzeArticleButton:hover {
+            background-color: #3c4043; /* Darker gray hover */
+        }
+        
+        /* Test Button (Prompt API) */
+        #testPromptApiButton {
+            background-color: #fbbc05; /* Google Yellow for visual distinction */
+            color: #3c4043;
+            margin-top: 0; /* Align tightly below textarea */
+        }
+        #testPromptApiButton:hover {
+            background-color: #e6a000;
+        }
+
+        /* Status & Result Display */
+        #status {
+            color: #5f6368;
+            font-size: 14px;
+            margin-top: 8px;
+            font-weight: 500;
+        }
+        #result {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #dadce0;
+            display: none; 
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid #dadce0;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bias Quell</h1>
+        
+        <p style="font-size: 12px; color: #777; margin: 0;">Test the **LIVE Prompt API** below:</p>
+
+        <!-- USER INPUT AREA -->
+        <textarea id="promptInput" placeholder="Enter text to analyze (e.g., 'What is confirmation bias?')" 
+            rows="3" style="width: 100%;"></textarea>
+
+        <button id="testPromptApiButton" class="test-button">Test Prompt API</button>
+        
+        <hr>
+
+        <!-- MAIN PIPELINE BUTTON -->
+        <button id="analyzeArticleButton">Analyze Article</button>
+        
+        <div id="status">Ready: Use the Test Prompt API button.</div>
+        <div id="result"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
