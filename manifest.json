@@ -9,16 +9,30 @@
     "128": "src/icons/icon128.png"
   },
   "permissions": [
-    "sidePanel",
     "activeTab",
     "scripting",
-    "ai"
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "action": {
     "default_title": "Bias Quell",
-    "default_icon": "src/icons/icon48.png"
+    "default_icon": "src/icons/icon48.png",
+    "default_popup": "src/sidepanel.html"
   },
   "side_panel": {
-    "default_path": "src/sidepanel.html"
-  }
+    "default_path": "src/sidepanel.html",
+    "default_icon": {
+      "16": "src/icons/icon16.png",
+      "48": "src/icons/icon48.png",
+      "128": "src/icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
 }
