@@ -1,24 +1,29 @@
 {
   "manifest_version": 3,
-  "name": "Bias Quell (Context Menu with Readability)",
-  "version": "1.0", 
-  "description": "a Cognitive Firewall that suppresses emotional bias and hype in online text (news, finance, and reports). Using Chrome's built-in AI, it extracts core facts and quantifies emotional intensity, helping you make rational decisions, not emotional ones.",
+  "name": "Bias Quell: On-Page AI Rewriter",
+  "version": "1.0",
+  "description": "Uses Gemini Nano to neutralize subjective bias and correct grammar in webpage text.",
   "permissions": [
     "activeTab",
-    "scripting",
-    "contextMenus",
-    "language",
-    "storage",
+    "storage",            
     "aiLanguageModelOriginTrial" 
   ],
-  
+  "host_permissions": [
+    "<all_urls>"             
+  ],
   "action": {
       "default_title": "Bias Quell",
       "default_popup": "src/popup.html" 
   },
 
-  "optional_host_permissions": [
-    "https://*/*", 
-    "http://*/*"
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [      
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
   ]
 }
