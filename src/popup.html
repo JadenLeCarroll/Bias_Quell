@@ -1,115 +1,109 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8"> 
     <title>Bias Quell</title>
     <style>
-        /* General Setup */
         body {
-            width: 300px;
-            padding: 16px;
-            font-family: 'Inter', Arial, sans-serif;
-            background-color: #ffffff;
+            width: 350px;
+            padding: 15px;
+            font-family: sans-serif;
         }
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+        h3 {
+            margin-top: 0;
+            color: #4285f4;
         }
-        h1 {
-            /* Neutral gray color for title */
-            color: #5f6368;
-            font-size: 20px;
-            margin: 0 0 16px 0;
-            font-weight: 600;
-        }
-        
-        /* Input Area Styling */
-        #promptInput {
+        textarea {
             width: 100%;
-            border: 1px solid #dadce0;
-            border-radius: 6px;
-            padding: 8px;
-            resize: none;
-            box-sizing: border-box; /* Include padding in width */
-            font-size: 13px;
+            height: 80px;
+            margin-bottom: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+            resize: none; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
-
-        /* Button Styling (General) */
-        button {
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
+        /* Drag and Drop Zone Style */
+        #image-drop-zone {
+            border: 2px dashed #aaa;
+            padding: 15px;
+            text-align: center;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: background-color 0.2s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            transition: border-color 0.2s, background-color 0.2s;
         }
-        
-        /* Main Button (Analyze Article) */
-        #analyzeArticleButton {
-            background-color: #5f6368; /* Neutral gray */
+        /* Single Image Preview Style */
+        #image-preview {
+            max-width: 100%; 
+            max-height: 180px;
+            width: auto; 
+            height: auto;
+            display: block; 
+            margin: 10px auto; 
+            border: 1px solid #4285f4; 
+            object-fit: contain; 
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            pointer-events: none; 
+        }
+        #response-area {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        #error-message {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        /* Standard Button Styles */
+        button {
+            width: 100%;
+            padding: 8px;
+            background-color: #4285f4;
             color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
         }
-        #analyzeArticleButton:hover {
-            background-color: #3c4043; /* Darker gray hover */
+        button:hover:not(:disabled) {
+            background-color: #357ae8;
         }
-        
-        /* Test Button (Prompt API) */
-        #testPromptApiButton {
-            background-color: #fbbc05; /* Google Yellow for visual distinction */
-            color: #3c4043;
-            margin-top: 0; /* Align tightly below textarea */
-        }
-        #testPromptApiButton:hover {
-            background-color: #e6a000;
+        button:disabled {
+            background-color: #a0c3ff;
+            cursor: not-allowed;
         }
 
-        /* Status & Result Display */
-        #status {
-            color: #5f6368;
-            font-size: 14px;
-            margin-top: 8px;
-            font-weight: 500;
-        }
-        #result {
-            background-color: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #dadce0;
-            display: none; 
-            white-space: pre-wrap;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        hr {
-            border: 0;
-            border-top: 1px solid #dadce0;
-            margin: 16px 0;
-        }
+        /* The old tagline-item class is no longer necessary as output is raw text */
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Bias Quell</h1>
-        
-        <p style="font-size: 12px; color: #777; margin: 0;">Test the **LIVE Prompt API** below:</p>
+    <h3>Bias Quell</h3>
+    <div id="error-message" style="display:none;"></div>
 
-        <!-- USER INPUT AREA -->
-        <textarea id="promptInput" placeholder="Enter text to analyze (e.g., 'What is confirmation bias?')" 
-            rows="3" style="width: 100%;"></textarea>
-
-        <button id="testPromptApiButton" class="test-button">Test Prompt API</button>
-        
-        <hr>
-
-        <!-- MAIN PIPELINE BUTTON -->
-        <button id="analyzeArticleButton">Analyze Article</button>
-        
-        <div id="status">Ready: Use the Test Prompt API button.</div>
-        <div id="result"></div>
+    <div id="image-drop-zone">
+        Drag & Drop Image Here or Click to Select
+        <input type="file" id="image-input" accept="image/png, image/jpeg, image/webp" style="display: none;">
     </div>
+    
+    <img id="image-preview" src="#" alt="Image Preview" style="display: none;"> 
 
+    <textarea id="prompt-input" placeholder="Enter text (e.g., a news headline or product description) for the bot to analyze and rewrite for bias."></textarea>
+    
+    <button id="submit-button">Quell Bias</button>
+
+    <h4>Bias Quell Output:</h4>
+    <div id="response-area">Upload an image and enter a prompt to begin.</div>
+    
     <script src="popup.js"></script>
 </body>
 </html>

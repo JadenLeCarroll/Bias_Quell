@@ -1,256 +1,241 @@
-// src/popup.js
+// popup.js
 
-// =================================================================================
-// GLOBAL CONFIGURATION
-// Since the environment is failing, we use MOCK data to ensure the pipeline runs.
-// =================================================================================
-const MIN_TEXT_LENGTH_FOR_ANALYSIS = 500;
+// --- CONFIGURATION ---
 
-// Define the structured output schema for the Prompt API (Stage 1: Bias Scoring)
-const BIAS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "emotion_score": { "type": "integer", "description": "Emotional bias score from -10 (Highly Negative) to +10 (Highly Positive)." },
-        "hype_words": { "type": "array", "items": { "type": "string" }, "description": "List 3 most hyperbolic words found." }
-    }
+// System Prompt: Defines the model's new role (Bias Quell) and enforces structured output.
+const SYSTEM_PROMPT = "You are a bias analysis and rewriting expert named Bias Quell. Your task is to analyze the user's text (and image, if provided) for implicit bias, subjective language, or unfair framing. Your response MUST contain a neutral, objective rewrite of the input text, focusing only on factual language. Provide a highly focused, structured response in JSON format. ONLY output the JSON object.";
+
+// JSON Schema: Defines the exact data structure the model MUST return (Now only 'quelled_text').
+const JSON_SCHEMA = {
+    type: 'object',
+    properties: {
+        quelled_text: { 
+            type: 'string', 
+            description: 'The rewritten, neutral, and objective version of the user\'s input text.' 
+        },
+        analysis_summary: {
+            type: 'string',
+            description: 'A brief summary of the bias found (e.g., subjective adjectives, emotional framing).'
+        }
+    },
+    required: ['quelled_text', 'analysis_summary'] // Requesting two fields for a richer output
 };
 
-const BIAS_PROMPT = (text) => `Analyze the following news article text. Determine its emotional bias score on a scale of -10 to +10. Identify the 3 most hyperbolic or emotionally charged words. Analyze the text only for emotional content, not factual accuracy. Text: "${text.substring(0, 8000)}..."`;
+
+// --- GLOBAL AI INSTANCES AND STATE ---
+let session = null; 
 
 
-// =================================================================================
-// 1. UTILITY FUNCTIONS (Non-AI)
-// =================================================================================
-function extractAllPageText() {
-    // This function is still executed via executeScript in the main tab context.
-    return document.body.innerText;
-}
+// --- UTILITY FUNCTION: FORMAT RAW JSON OUTPUT ---
 
+/**
+ * Takes the raw JSON string output and formats it into a human-readable, professional string.
+ * It now only formats the neutral, quelled text and the analysis summary.
+ */
+function formatCreativeResponse(jsonString) {
+    try {
+        const data = JSON.parse(jsonString);
 
-// =================================================================================
-// 2. LIVE CORE API EXECUTION FUNCTIONS (WITH MOCK FALLBACKS)
-// =================================================================================
-
-// Stage 1: Get Bias Score (Uses Prompt API)
-async function runPromptAPIStep(rawArticleText) {
-    if (typeof window.LanguageModel === 'undefined') {
-        // --- FALLBACK MOCK for critical failure ---
-        return { emotion_score: 8, hype_words: ["massive", "skyrocket", "unprecedented"] };
-    }
-    
-    // --- LIVE PATH ---
-    const availabilityStatus = await window.LanguageModel.availability();
-    if (availabilityStatus !== 'available' && availabilityStatus !== 'downloading') {
-         throw new Error(`Model not ready. Status: ${availabilityStatus}`);
-    }
-
-    const session = await window.LanguageModel.create();
-    const resultJsonString = await session.prompt(
-        BIAS_PROMPT(rawArticleText), 
-        { responseConstraint: { type: "json", schema: BIAS_SCHEMA } }
-    );
-    session.destroy();
-    
-    return JSON.parse(resultJsonString); // Returns {emotion_score, hype_words}
-}
-
-// Stage 2: Neutralize Text (Uses Rewriter API)
-async function runRewriterAPIStep(rawArticleText) {
-    if (typeof window.Rewriter === 'undefined') {
-        // --- FALLBACK MOCK for critical failure ---
-        return "The company's stock rose 5% following the Q4 report. Earnings per share were $1.20, which met expectations. Management confirmed the production forecast remains steady through Q3.";
-    }
-
-    // --- LIVE PATH ---
-    const NEUTRALIZATION_CONTEXT = "Rewrite this article to remove all subjective adjectives and hyperbolic language. Maintain all numerical data and objective claims in a strictly neutral, journalistic tone.";
-    
-    const rewriter = await window.Rewriter.create();
-    
-    const neutralText = await rewriter.rewrite(
-        rawArticleText,
-        { context: NEUTRALIZATION_CONTEXT, tone: 'neutral', format: 'plain-text' }
-    );
-    rewriter.destroy();
-    return neutralText; // Returns the full, neutralized article text
-}
-
-// Stage 3: Condensing Facts (Uses Summarizer API)
-async function runSummarizerAPIStep(neutralText) {
-    if (typeof window.Summarizer === 'undefined') {
-        // --- FALLBACK MOCK for critical failure ---
-        return "* Q4 Revenue Growth: +15% YoY.\n* EPS: $1.20, meeting consensus.\n* Outlook: Management affirmed steady production forecast through Q3.";
-    }
-
-    // --- LIVE PATH ---
-    const summarizer = await window.Summarizer.create();
-    
-    const finalSummary = await summarizer.summarize(
-        neutralText,
-        {
-            type: 'key-points', 
-            format: 'markdown',
-            length: 'short'
+        if (!data || !data.quelled_text || !data.analysis_summary) {
+            // Check for the expected fields
+            return "Error: Could not parse expected data (quelled_text or analysis_summary field missing).";
         }
-    );
-    summarizer.destroy();
-    return finalSummary; // Returns the short, objective bullet points
-}
 
-// Function dedicated to the Test button (Now accepts user input)
-async function runSimplePromptTest(userInput) {
-    if (typeof window.LanguageModel === 'undefined') {
-        // --- FALLBACK MOCK for critical failure ---
-        return { 
-            prompt: userInput, 
-            response: "MOCK: The AI model is currently unavailable on your hardware, but this test demonstrates successful prompt handling and structured output capability."
-        };
-    }
-    
-    // --- LIVE PATH ---
-    
-    const availabilityStatus = await window.LanguageModel.availability();
-    if (availabilityStatus !== 'available' && availabilityStatus !== 'downloading') {
-         throw new Error(`Model not ready. Status: ${availabilityStatus}`);
-    }
-
-    const session = await window.LanguageModel.create();
-    const responseText = await session.prompt(userInput);
-    session.destroy();
-    
-    return { prompt: userInput, response: responseText };
-}
-
-
-// =================================================================================
-// 3. MAIN EVENT LISTENERS (The Controller Logic)
-// =================================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    const analyzeButton = document.getElementById('analyzeArticleButton');
-    const testButton = document.getElementById('testPromptApiButton');
-    const statusDiv = document.getElementById('status');
-    const resultDiv = document.getElementById('result');
-    // We assume the prompt input field is added in the HTML with id='promptInput'
-    const promptInput = document.getElementById('promptInput'); 
-    
-    // Re-enable the Analyze Article button now that we have the APIs working
-    analyzeButton.disabled = false;
-    analyzeButton.textContent = 'Analyze Article';
-    
-    statusDiv.textContent = 'Ready: Use the Test Prompt API button.';
-
-    // --- Test Button Listener (Verification) ---
-    testButton.addEventListener('click', () => {
-        const userInput = promptInput ? promptInput.value.trim() : "Default test prompt: Summarize this.";
+        let formattedOutput = "★ **BIAS QUELL ANALYSIS** ★\n";
+        formattedOutput += "=======================================\n\n";
         
-        if (userInput.length === 0 || userInput === "Type your test prompt here...") {
-            statusDiv.textContent = 'Please enter text for the Prompt API test.';
-            return;
-        }
+        // 1. Analysis Summary
+        formattedOutput += "**Bias Summary:**\n";
+        formattedOutput += `${data.analysis_summary}\n\n`; 
+        
+        // 2. Quelled Output (The rewritten text)
+        formattedOutput += "**Neutral Rewrite:**\n";
+        formattedOutput += `${data.quelled_text}\n`; 
 
-        statusDiv.textContent = 'Starting API test...';
-        testButton.disabled = true;
-        testButton.textContent = 'Testing...';
-        resultDiv.style.display = 'none';
+        formattedOutput += "\n=======================================";
 
-        runSimplePromptTest(userInput)
-            .then(data => {
-                // Determine if data is MOCK based on content of the response string
-                const source = data.response.includes('MOCK:') ? "MOCK DATA (Fallback)" : "LIVE API";
-                statusDiv.textContent = `Prompt API Test Successful! (${source})`;
-                
-                resultDiv.innerHTML = `
-                    <h3>Prompt API Result:</h3>
-                    <p><strong>Input:</strong> <em>${data.prompt}</em></p>
-                    <hr>
-                    <p><strong>Response:</strong><br>${data.response}</p>
-                `;
-                resultDiv.style.display = 'block';
-                
-                testButton.disabled = false;
-                testButton.textContent = 'Test Prompt API';
-            })
-            .catch(error => {
-                statusDiv.textContent = `FATAL API ERROR: ${error.message}`;
-                resultDiv.innerHTML = `<p>Error occurred during API call. Check console for details.</p>`;
-                resultDiv.style.display = 'block';
-                testButton.disabled = false;
-                testButton.textContent = 'Test Prompt API';
+        return formattedOutput;
+
+    } catch (e) {
+        console.error("Formatting Error:", e);
+        return `Error: Model output was not valid JSON. Please check the raw output:\n\n${jsonString}`;
+    }
+}
+
+
+// --- MAIN LOGIC ---
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // --- ELEMENT REFERENCES ---
+    const errorMessage = document.getElementById("error-message");
+    const promptInput = document.getElementById("prompt-input");
+    const submitButton = document.getElementById("submit-button");
+    const responseArea = document.getElementById("response-area");
+    const imageInput = document.getElementById("image-input");
+    const imagePreview = document.getElementById("image-preview");
+    const imageDropZone = document.getElementById("image-drop-zone");
+    
+
+    // --- 1. INITIAL API CHECK AND SESSION SETUP ---
+    if (!('LanguageModel' in self)) { 
+        errorMessage.style.display = "block";
+        errorMessage.textContent = `Error: Required AI API (LanguageModel) not supported.`;
+        submitButton.disabled = true;
+        return;
+    }
+    
+    const updateSession = async () => {
+        try {
+            if (session) session.destroy();
+            
+            // Create LanguageModel Session (for Prompt API - Multimodal)
+            session = await LanguageModel.create({
+                initialPrompts: [{ role: 'system', content: SYSTEM_PROMPT }],
+                expectedInputs: [
+                    { type: 'text' }, 
+                    { type: 'image' } 
+                ],
             });
+            console.log("AI session created.");
+        } catch (e) {
+            errorMessage.style.display = "block";
+            errorMessage.textContent = `Error creating AI session: ${e.message}. Check Chrome flags and disk space.`;
+            submitButton.disabled = true;
+        }
+    };
+
+    await updateSession();
+
+    // --- 2. IMAGE HANDLER (PREVIEW & DRAG-AND-DROP) ---
+    
+    const handleFileSelection = (files) => {
+        const file = files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                responseArea.textContent = 'Image selected. Enter text to analyze.';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            imagePreview.style.display = 'none';
+            imagePreview.src = '#';
+        }
+    };
+
+    // A. Standard File Input Event Listener
+    imageInput.addEventListener('change', (e) => {
+        handleFileSelection(e.target.files); 
     });
 
-    // --- Analyze Article Button Listener (The Full Live Pipeline) ---
-    analyzeButton.addEventListener('click', () => {
-        statusDiv.textContent = 'Initiating Bias Quell...';
-        analyzeButton.disabled = true;
-        analyzeButton.textContent = 'Processing...';
-        resultDiv.style.display = 'none';
-        resultDiv.innerHTML = '';
+    // B. Drag and Drop Logic
+    
+    // Prevent default browser behavior for drag events targeting the drop zone
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        imageDropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+    });
 
-        let rawArticleText;
-        let biasData; // To hold results from Stage 1
+    // Visual feedback on drag enter
+    imageDropZone.addEventListener('dragenter', () => {
+        imageDropZone.style.borderColor = '#4285f4';
+        imageDropZone.style.backgroundColor = '#e6e6e6';
+    }, false);
+    
+    // Visual feedback on drag leave (or drop is complete)
+    ['dragleave', 'drop'].forEach(eventName => {
+        imageDropZone.addEventListener(eventName, () => {
+            imageDropZone.style.borderColor = '#aaa';
+            imageDropZone.style.backgroundColor = '#f0f0f0';
+        }, false);
+    });
 
-        // 1. Get Text using Chrome Extension API (The only piece that interacts with the tab)
-        chrome.tabs.query({ active: true, currentWindow: true })
-            .then((tabs) => {
-                if (tabs.length === 0) throw new Error("No active tab found.");
+    // Handle the file drop event
+    imageDropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+            const newFileList = new DataTransfer();
+            newFileList.items.add(files[0]);
 
-                // EXECUTE THE EXTRACTION DIRECTLY, relying on the function definition above
-                return chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: extractAllPageText 
+            imageInput.files = newFileList.files;
+            handleFileSelection(newFileList.files); 
+        }
+    }, false);
+
+    // Make the drop zone clickable
+    imageDropZone.addEventListener('click', () => {
+        imageInput.click();
+    });
+
+
+    // --- 3. PROMPTING LOGIC (CORE MULTIMODAL GENERATION) ---
+    const promptModel = async (e) => {
+        e.preventDefault();
+        const prompt = promptInput.value.trim();
+        const imageFile = imageInput.files[0]; 
+
+        if ((!prompt && !imageFile) || !session) {
+             responseArea.textContent = "Please provide text to analyze and/or an image for context.";
+             return;
+        }
+
+        responseArea.innerHTML = "Analyzing bias and generating rewrite...";
+        submitButton.disabled = true;
+
+        try {
+            // Build the explicit content array
+            const userMessageContent = [];
+
+            // 1. Image part (if available)
+            if (imageFile) {
+                userMessageContent.push({
+                    type: 'image',
+                    value: imageFile 
                 });
-            })
-            .then((results) => {
-                rawArticleText = results && results.length > 0 && results[0].result ? results[0].result : null;
+            }
+            
+            // 2. Text part (if available)
+            if (prompt) {
+                 userMessageContent.push({
+                    type: 'text',
+                    value: prompt 
+                });
+            }
 
-                if (!rawArticleText || rawArticleText.length < MIN_TEXT_LENGTH_FOR_ANALYSIS) {
-                     throw new Error('Content too short or unavailable for analysis.');
-                }
-                
-                // 2. STAGE 1: Get Bias Score (Prompt API)
-                statusDiv.textContent = 'Text acquired. Running Stage 1: Bias Scoring...';
-                return runPromptAPIStep(rawArticleText);
-            })
-            .then(bData => {
-                biasData = bData; // Save bias data for final result display
-                statusDiv.textContent = `Stage 1 Complete. Score: ${biasData.emotion_score}/10. Running Stage 2...`;
+            const messageArray = [{ role: 'user', content: userMessageContent }];
 
-                // 3. STAGE 2: Get Neutralized Text (Rewriter API)
-                return runRewriterAPIStep(rawArticleText);
-            })
-            .then(neutralText => {
-                statusDiv.textContent = 'Stage 2 Complete. Text Neutralized. Running Stage 3...';
-
-                // 4. STAGE 3: Get Final Summary (Summarizer API)
-                return runSummarizerAPIStep(neutralText);
-            })
-            .then(finalSummary => {
-                // 5. FINAL DISPLAY
-                const source = (typeof window.LanguageModel === 'undefined') ? "MOCK DATA (Fallback)" : "LIVE API";
-                const score = biasData.emotion_score;
-                const hypeWords = biasData.hype_words ? biasData.hype_words.join(', ') : 'N/A';
-
-                const finalOutputHTML = `
-                    <h3>Objective Digest (Bias Quelled):</h3>
-                    <p><strong>Source Analysis:</strong> <span style="font-weight: bold;">${score}/10</span></p>
-                    <p><strong>Hype Words Removed:</strong> <em>${hypeWords}</em></p>
-                    <hr>
-                    <p style="font-weight: bold; margin-bottom: 5px;">Objective Key Facts (Summarizer):</p>
-                    <div style="white-space: pre-wrap;">${finalSummary}</div>
-                `;
-
-                statusDiv.textContent = 'Analysis Complete! Review the objective digest below.';
-                resultDiv.innerHTML = finalOutputHTML;
-                resultDiv.style.display = 'block';
-                
-                analyzeButton.disabled = false;
-                analyzeButton.textContent = 'Analyze Article';
-            })
-            .catch((error) => {
-                // Global error handler
-                statusDiv.textContent = `CRITICAL FAILURE: ${error.message}`;
-                analyzeButton.disabled = false;
-                analyzeButton.textContent = 'Analyze Article';
+            // Call the Prompt API with the JSON constraint
+            const stream = await session.promptStreaming(messageArray, {
+                responseConstraint: JSON_SCHEMA
             });
+
+            let result = '';
+            responseArea.textContent = ''; 
+
+            for await (const chunk of stream) {
+                result += chunk;
+                responseArea.textContent = result;
+            }
+            
+            // Final Step: Format the raw JSON into human-readable and insert into the DOM
+            responseArea.innerHTML = formatCreativeResponse(result);
+
+        } catch (error) {
+            responseArea.textContent = `Error during generation: ${error.message}`;
+        } finally {
+            submitButton.disabled = false;
+        }
+    };
+
+    // --- 4. ATTACH LISTENERS FOR MAIN ACTIONS ---
+    submitButton.addEventListener("click", promptModel);
+
+    promptInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            promptModel(e);
+        }
     });
 });
