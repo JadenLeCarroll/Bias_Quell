@@ -1,4 +1,4 @@
-// popup.js (Controls the toggle and displays status summary)
+// popup.js (Original Version)
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ELEMENT REFERENCES ---
@@ -7,13 +7,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseArea = document.getElementById("response-area");
 
     // --- 1. INITIAL SETUP ---
-    if (!('Rewriter' in self)) { 
+    if (!('Rewriter' in self)) {
         errorMessage.style.display = "block";
         errorMessage.textContent = `Error: Required AI APIs not detected.`;
         submitButton.disabled = true;
         return;
     }
-    
+
     // Function to update the button and status text based on state
     const renderState = (isActive, changesMade = 0) => {
         submitButton.disabled = false;
@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitButton.classList.remove('off');
             submitButton.classList.add('on');
             submitButton.textContent = "Bias Quell is ACTIVE (Click to Turn Off)";
+            // REVERTED MESSAGE: This now shows the specific count of changes.
             responseArea.innerHTML = `
                 ✅ **BIAS QUELL ACTIVE.**
                 <hr style="border: 0; border-top: 1px solid #ddd; margin: 8px 0;">
@@ -34,10 +35,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             responseArea.textContent = "Feature currently inactive. Click 'Activate' to neutralize bias on this page.";
         }
     };
-    
-    // --- INITIAL STATE CHECK (Fixes the button stuck in disabled state) ---
-    submitButton.disabled = true; // Temporarily disable while checking state
+
+    // --- INITIAL STATE CHECK ---
+    submitButton.disabled = true;
     chrome.runtime.sendMessage({ action: "REQUEST_TOGGLE_STATE" }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.warn("Bias Quell:", chrome.runtime.lastError.message);
+            renderState(false);
+            return;
+        }
         if (response && response.hasOwnProperty('isQuellActive')) {
             renderState(response.isQuellActive);
         } else {
@@ -54,20 +60,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         submitButton.disabled = true;
         responseArea.textContent = newState ? "Activating and scanning page..." : "Deactivating feature, reverting changes...";
-        
+
         try {
-            // Send TOGGLE message to background script
             chrome.runtime.sendMessage({
                 action: "TOGGLE_QUELL",
                 newState: newState
             }, (response) => {
+                if (chrome.runtime.lastError) {
+                    errorMessage.textContent = `Action failed: ${chrome.runtime.lastError.message}`;
+                    renderState(!newState);
+                    return;
+                }
+
                 if (response && response.success) {
-                    // Update UI using the returned data (changesMade is included in the response)
+                    // Pass the changesMade count to the render function
                     renderState(newState, response.changesMade);
                 } else {
                     errorMessage.textContent = `Action failed: ${response?.error || "Unknown communication error."}`;
-                    // Revert to the state *before* the click if it failed
-                    renderState(!newState); 
+                    renderState(!newState);
                 }
             });
         } catch (error) {

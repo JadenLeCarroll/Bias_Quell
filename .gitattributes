@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Tell Linguist to ignore specific files that skew language stats:
+LICENSE linguist-language=Text
+README.md linguist-language=Markdown
+.gitignore linguist-language=Text
