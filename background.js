@@ -1,4 +1,4 @@
-// background.js
+// background.js (No changes needed, but confirming logic is correct)
 
 // 1. Initialize the global state: Bias Quell is OFF by default.
 chrome.runtime.onInstalled.addListener(() => {
@@ -23,8 +23,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // 1. Update state first
             await chrome.storage.local.set({ isQuellActive: newState });
             
-            // 2. Find the active tab and tell the content script to run its main function
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            // 2. Find the active tab
+            // This query can fail if the user is on a restricted page (e.g., chrome://extensions)
+            let tab;
+            try {
+                [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (!tab) throw new Error("No active tab found.");
+            } catch (error) {
+                // Fail immediately if we can't find the tab to message
+                sendResponse({ success: false, error: `Tab access failed: ${error.message}` });
+                return;
+            }
             
             // 3. Send message and await response from content.js with the changesMade count
             try {
@@ -40,8 +49,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     action: newState ? 'ACTIVATED' : 'DEACTIVATED' 
                 });
             } catch (error) {
-                // Failure: Content script communication failed (e.g., page reloaded or script threw an error)
-                 sendResponse({ success: false, error: `Content Script Error: ${error.message}` });
+                // Failure: Content script communication failed (e.g., script not injected, page reloaded, content script error)
+                 sendResponse({ success: false, error: `Content Script Communication Error: ${error.message}` });
             }
         })();
         return true;

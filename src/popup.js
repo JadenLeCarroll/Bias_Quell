@@ -1,4 +1,4 @@
-// popup.js (Original Version)
+// popup.js (Final Corrected Version)
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ELEMENT REFERENCES ---
@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseArea = document.getElementById("response-area");
 
     // --- 1. INITIAL SETUP ---
+    // Check for the AI API requirement, though the main failure happens in content.js
     if (!('Rewriter' in self)) {
         errorMessage.style.display = "block";
         errorMessage.textContent = `Error: Required AI APIs not detected.`;
@@ -16,13 +17,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Function to update the button and status text based on state
     const renderState = (isActive, changesMade = 0) => {
-        submitButton.disabled = false;
+        // Always re-enable the button once state is known
+        submitButton.disabled = false; 
+        errorMessage.style.display = "none";
+        errorMessage.textContent = "";
 
         if (isActive) {
             submitButton.classList.remove('off');
             submitButton.classList.add('on');
             submitButton.textContent = "Bias Quell is ACTIVE (Click to Turn Off)";
-            // REVERTED MESSAGE: This now shows the specific count of changes.
             responseArea.innerHTML = `
                 ✅ **BIAS QUELL ACTIVE.**
                 <hr style="border: 0; border-top: 1px solid #ddd; margin: 8px 0;">
@@ -37,13 +40,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- INITIAL STATE CHECK ---
-    submitButton.disabled = true;
+    // Disable temporarily while waiting for the background script
+    submitButton.disabled = true; 
+    
     chrome.runtime.sendMessage({ action: "REQUEST_TOGGLE_STATE" }, (response) => {
+        // Re-enable button after we get the response or an error
+        submitButton.disabled = false; 
+
         if (chrome.runtime.lastError) {
             console.warn("Bias Quell:", chrome.runtime.lastError.message);
-            renderState(false);
+            // On error, default to inactive but make sure the button is still clickable
+            renderState(false); 
             return;
         }
+        
         if (response && response.hasOwnProperty('isQuellActive')) {
             renderState(response.isQuellActive);
         } else {
@@ -53,12 +63,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- 2. TOGGLE LOGIC ---
     submitButton.addEventListener("click", async (e) => {
-        e.preventDefault();
+        e.preventDefault(); 
 
         const wasActive = submitButton.classList.contains('on');
         const newState = !wasActive;
 
         submitButton.disabled = true;
+        errorMessage.style.display = "none";
+        errorMessage.textContent = "";
         responseArea.textContent = newState ? "Activating and scanning page..." : "Deactivating feature, reverting changes...";
 
         try {
@@ -66,9 +78,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 action: "TOGGLE_QUELL",
                 newState: newState
             }, (response) => {
+                
                 if (chrome.runtime.lastError) {
+                    errorMessage.style.display = "block";
                     errorMessage.textContent = `Action failed: ${chrome.runtime.lastError.message}`;
-                    renderState(!newState);
+                    renderState(!newState); 
                     return;
                 }
 
@@ -76,11 +90,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Pass the changesMade count to the render function
                     renderState(newState, response.changesMade);
                 } else {
+                    // Critical for showing errors from content.js (like API initialization failure)
+                    errorMessage.style.display = "block";
                     errorMessage.textContent = `Action failed: ${response?.error || "Unknown communication error."}`;
-                    renderState(!newState);
+                    renderState(!newState); 
                 }
             });
         } catch (error) {
+            // Catches synchronous JS errors
+            errorMessage.style.display = "block";
             errorMessage.textContent = `Toggle Error: ${error.message}`;
             submitButton.disabled = false;
         }
