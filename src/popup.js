@@ -1,4 +1,4 @@
-// popup.js (Final Corrected Version)
+// popup.js
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ELEMENT REFERENCES ---
@@ -7,17 +7,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseArea = document.getElementById("response-area");
 
     // --- 1. INITIAL SETUP ---
-    // Check for the AI API requirement, though the main failure happens in content.js
     if (!('Rewriter' in self)) {
         errorMessage.style.display = "block";
-        errorMessage.textContent = `Error: Required AI APIs not detected.`;
+        errorMessage.textContent = `Error: Required AI APIs not detected in popup context.`;
         submitButton.disabled = true;
         return;
     }
 
     // Function to update the button and status text based on state
     const renderState = (isActive, changesMade = 0) => {
-        // Always re-enable the button once state is known
         submitButton.disabled = false; 
         errorMessage.style.display = "none";
         errorMessage.textContent = "";
@@ -40,16 +38,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- INITIAL STATE CHECK ---
-    // Disable temporarily while waiting for the background script
     submitButton.disabled = true; 
     
     chrome.runtime.sendMessage({ action: "REQUEST_TOGGLE_STATE" }, (response) => {
-        // Re-enable button after we get the response or an error
         submitButton.disabled = false; 
 
         if (chrome.runtime.lastError) {
             console.warn("Bias Quell:", chrome.runtime.lastError.message);
-            // On error, default to inactive but make sure the button is still clickable
             renderState(false); 
             return;
         }
@@ -87,17 +82,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (response && response.success) {
-                    // Pass the changesMade count to the render function
                     renderState(newState, response.changesMade);
                 } else {
-                    // Critical for showing errors from content.js (like API initialization failure)
+                    // Display the specific error relayed from background/content script
                     errorMessage.style.display = "block";
                     errorMessage.textContent = `Action failed: ${response?.error || "Unknown communication error."}`;
                     renderState(!newState); 
                 }
             });
         } catch (error) {
-            // Catches synchronous JS errors
             errorMessage.style.display = "block";
             errorMessage.textContent = `Toggle Error: ${error.message}`;
             submitButton.disabled = false;

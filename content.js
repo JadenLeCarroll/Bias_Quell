@@ -1,30 +1,25 @@
-// content.js (Simplified Version)
+// content.js (Final Optimized Version)
 
 // --- CONFIGURATION ---
 const REWRITE_CONTEXT = "You are an extremely vigilant bias detection engine. Rewrite the input text to be strictly objective, removing subjective language, emotional adjectives, and absolute terms. Only make a change if bias is detected.";
-const TARGET_SELECTORS = ['p', 'li', 'h2', 'h3', 'h4'];
-const HIGHLIGHT_COLOR = '#ffffe0'; // Yellow highlight
-
-// Small yield to prevent blocking the UI during heavy processing
-const YIELD_TIME_MS = 10; 
+// Reduced selectors for speed
+const TARGET_SELECTORS = ['p', 'li', 'h2', 'h3']; 
+const MIN_TEXT_LENGTH = 30; // Increased minimum length for efficiency
+const BATCH_SIZE = 15; // Number of elements to process concurrently
+const HIGHLIGHT_COLOR = '#ffffe0'; 
 
 let rewriter = null;
 let originalTextMap = new Map(); 
 
-// --- UTILITY: SLEEP FUNCTION ---
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 // --- 1. INITIALIZE AI API (Called only on user click) ---
 async function initializeRewriter() {
     if (!('Rewriter' in self)) {
-        console.error("Bias Quell: Rewriter API not available.");
         return false;
     }
     
     if (!rewriter) {
         try {
             rewriter = await Rewriter.create({});
-            console.log("Bias Quell: Rewriter successfully initialized.");
         } catch (e) {
             console.error("Bias Quell: Failed to create Rewriter instance.", e.message);
             return false;
@@ -46,48 +41,66 @@ function setupHoverEvents(element, originalText) {
     });
 }
 
-// --- 3. MAIN REWRITING LOGIC ---
+// --- 3. MAIN REWRITING LOGIC (CONCURRENT BATCHING) ---
 async function quellBiasOnPage() {
     let rewriteCount = 0;
-    const elementsToProcess = document.querySelectorAll(TARGET_SELECTORS.join(','));
-    console.log(`Bias Quell: Starting scan on ${elementsToProcess.length} elements.`);
+    const elementsToProcess = Array.from(document.querySelectorAll(TARGET_SELECTORS.join(',')));
+    const elementsForBatching = [];
 
+    // Filter elements first to build the full array for processing
     for (const element of elementsToProcess) {
-        // Yield occasionally to keep UI responsive
-        if (rewriteCount % 10 === 0) { 
-            await sleep(YIELD_TIME_MS);
-        }
-
         const originalText = element.textContent.trim();
-        
-        // Skip short elements or those already quelled
-        if (originalText.length < 15 || originalTextMap.has(element)) {
-            continue;
+        if (originalText.length >= MIN_TEXT_LENGTH && !originalTextMap.has(element)) {
+            elementsForBatching.push(element);
         }
+    }
 
-        try {
-            const neutralText = await rewriter.rewrite(originalText, {
+    console.log(`Bias Quell: Found ${elementsForBatching.length} elements ready for rewriting.`);
+
+    // Process elements in batches using Promise.all
+    for (let i = 0; i < elementsForBatching.length; i += BATCH_SIZE) {
+        const batch = elementsForBatching.slice(i, i + BATCH_SIZE);
+        
+        // Create an array of Promises for the current batch
+        const rewritePromises = batch.map(element => {
+            const originalText = element.textContent.trim();
+            
+            return rewriter.rewrite(originalText, {
                 context: REWRITE_CONTEXT,
                 tone: 'neutral',
                 length: 'as-is',
                 outputLanguage: 'en' 
+            })
+            .then(neutralText => ({ element, originalText, finalNeutralText: neutralText.trim() }))
+            .catch(error => {
+                console.warn(`Bias Quell: Skipping one block due to API error.`, error.message);
+                return { element, skip: true };
             });
-            
-            const finalNeutralText = neutralText.trim();
+        });
 
-            if (finalNeutralText !== originalText) {
-                // SUCCESS: Make the DOM change
-                originalTextMap.set(element, originalText); 
-                element.textContent = finalNeutralText;
-                element.style.backgroundColor = HIGHLIGHT_COLOR;
-                setupHoverEvents(element, originalText);
-                rewriteCount++;
-                console.log(`Bias Quell: Successfully processed text block #${rewriteCount}.`);
+        // Wait for all promises in the current batch to resolve
+        const results = await Promise.all(rewritePromises);
+        
+        // Apply changes to the DOM
+        for (const result of results) {
+            if (result.skip || result.finalNeutralText === result.originalText) {
+                continue;
             }
-        } catch (error) {
-            console.warn(`Bias Quell: Skipping text block due to error.`, error.message);
+            
+            // SUCCESS: Make the DOM change
+            originalTextMap.set(result.element, result.originalText); 
+            result.element.textContent = result.finalNeutralText;
+            result.element.style.backgroundColor = HIGHLIGHT_COLOR;
+            setupHoverEvents(result.element, result.originalText);
+            rewriteCount++;
+        }
+        
+        // A brief yield to let the browser breathe after applying changes
+        if (i + BATCH_SIZE < elementsForBatching.length) {
+            await new Promise(resolve => setTimeout(resolve, 5));
         }
     }
+    
     console.log(`Bias Quell: Scan finished. Total changes: ${rewriteCount}.`);
     return rewriteCount;
 }
@@ -100,7 +113,6 @@ function revertChanges() {
         const originalText = originalTextMap.get(element);
         
         if (element.parentNode) {
-            // Restore original text and clear highlight using a clone
             const newElement = element.cloneNode(true); 
             newElement.textContent = originalText; 
             newElement.style.backgroundColor = 'transparent'; 
@@ -109,11 +121,12 @@ function revertChanges() {
     });
     
     originalTextMap.clear(); 
-    rewriter = null; // Allow re-initialization on next activation
+    // Setting rewriter to null ensures initialization runs again on next click (user gesture)
+    rewriter = null; 
     console.log("Bias Quell: Reverted all changes.");
 }
 
-// --- 5. MESSAGE LISTENER (Triggered by Background Script) ---
+// --- 5. MESSAGE LISTENER (The main entry point) ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "RUN_FULL_QUELL") {
         (async () => {
@@ -122,6 +135,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     // Initialize APIs on user click
                     const apiSuccess = await initializeRewriter();
                     if (!apiSuccess) {
+                         // Send failure message back if initialization failed
                          sendResponse({ success: false, error: "AI API initialization failed. Check console for details." });
                          return;
                     }

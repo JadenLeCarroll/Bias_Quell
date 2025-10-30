@@ -1,4 +1,4 @@
-// background.js (No changes needed, but confirming logic is correct)
+// background.js
 
 // 1. Initialize the global state: Bias Quell is OFF by default.
 chrome.runtime.onInstalled.addListener(() => {
@@ -8,7 +8,6 @@ chrome.runtime.onInstalled.addListener(() => {
 // 2. Listener that routes the TOGGLE STATE request from the Popup.
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "REQUEST_TOGGLE_STATE") {
-        // Guarantee a response is sent.
         chrome.storage.local.get('isQuellActive', (data) => {
             sendResponse({ isQuellActive: data.isQuellActive || false }); 
         });
@@ -24,18 +23,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             await chrome.storage.local.set({ isQuellActive: newState });
             
             // 2. Find the active tab
-            // This query can fail if the user is on a restricted page (e.g., chrome://extensions)
             let tab;
             try {
                 [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (!tab) throw new Error("No active tab found.");
             } catch (error) {
-                // Fail immediately if we can't find the tab to message
                 sendResponse({ success: false, error: `Tab access failed: ${error.message}` });
                 return;
             }
             
-            // 3. Send message and await response from content.js with the changesMade count
+            // 3. Send message and await response from content.js
             try {
                 const contentResponse = await chrome.tabs.sendMessage(tab.id, {
                     action: "RUN_FULL_QUELL",
@@ -49,7 +46,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     action: newState ? 'ACTIVATED' : 'DEACTIVATED' 
                 });
             } catch (error) {
-                // Failure: Content script communication failed (e.g., script not injected, page reloaded, content script error)
+                // Failure: Content script communication failed (e.g., script threw an error, or permission denied)
                  sendResponse({ success: false, error: `Content Script Communication Error: ${error.message}` });
             }
         })();
