@@ -1,5 +1,3 @@
-// background.js
-
 // 1. Initialize the global state: Bias Quell is OFF by default.
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set({ isQuellActive: false });

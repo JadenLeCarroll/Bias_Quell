@@ -1,5 +1,3 @@
-// popup.js
-
 document.addEventListener('DOMContentLoaded', async () => {
     // --- ELEMENT REFERENCES ---
     const errorMessage = document.getElementById("error-message");
